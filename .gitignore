@@ -1,29 +1,26 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
 *.exe
-*.out
-*.app
+*.dll
+*.zip
+*.BAK*
+*.OLD*
+*.ORIG*
+*.sdf
+*.suo
+*.db
+*.vcxproj.user
+*.opensdf
+*.save
+*.depend
+*.layout
+nanovg/
+nanosvg/
+download/
+lib/
+android/libs/
+android/obj/
+obj/
+com.rado1.*/
+*downloads/
+Release/
+Debug/
+ipch/

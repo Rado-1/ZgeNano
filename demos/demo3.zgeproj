@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<ZApplication Name="App" Comment="Created by Rado1" Caption="ZgeNano Demo 3" ClearColor="0 0 0 1" AmbientLightColor="0.502 0.502 0.502 1" ScreenMode="0" ViewportRatio="3" ClipFar="1000" MouseVisible="255" UseStencilBuffer="255" RenderOrder="1" FileVersion="2" AndroidPackageName="com.rado1.ZgeNanoDemo3">
+  <OnLoaded>
+    <ZExternalLibrary Comment="ZgeNano vector graphics rendering library" ModuleName="ZgeNano" CallingConvention="1">
+      <Source>
+<![CDATA[/*
+  ZgeNano Library; a vector graphics rendering library
+  build on NanoVG: https://github.com/memononen/nanovg
+  and NanoSVG: https://github.com/memononen/nanosvg
+
+  Download Windows DLL and Android shared library from
+  TBD
+
+  Project home
+  TBD
+
+  Copyright (c) 2016 Radovan Cervenka
+*/
+
+// init flags
+const int
+  NVG_ANTIALIAS = 1<<0,
+	NVG_STENCIL_STROKES = 1<<1,
+	NVG_DEBUG = 1<<2;
+
+// solidity
+const int
+  NVG_SOLID = 1,
+	NVG_HOLE = 2;
+
+// line caps
+const int
+	NVG_BUTT = 0,
+	NVG_ROUND = 1,
+	NVG_SQUARE = 2,
+	NVG_BEVEL = 3,
+	NVG_MITER = 4;
+
+// align
+const int
+	// Horizontal align
+	NVG_ALIGN_LEFT 		= 1<<0,	// Default, align text horizontally to left.
+	NVG_ALIGN_CENTER 	= 1<<1,	// Align text horizontally to center.
+	NVG_ALIGN_RIGHT 	= 1<<2,	// Align text horizontally to right.
+	// Vertical align
+	NVG_ALIGN_TOP 		= 1<<3,	// Align text vertically to top.
+	NVG_ALIGN_MIDDLE	= 1<<4,	// Align text vertically to middle.
+	NVG_ALIGN_BOTTOM	= 1<<5,	// Align text vertically to bottom.
+	NVG_ALIGN_BASELINE	= 1<<6; // Default, align text vertically to baseline.
+
+// blend factor
+const int
+	NVG_ZERO = 1<<0,
+	NVG_ONE = 1<<1,
+	NVG_SRC_COLOR = 1<<2,
+	NVG_ONE_MINUS_SRC_COLOR = 1<<3,
+	NVG_DST_COLOR = 1<<4,
+	NVG_ONE_MINUS_DST_COLOR = 1<<5,
+	NVG_SRC_ALPHA = 1<<6,
+	NVG_ONE_MINUS_SRC_ALPHA = 1<<7,
+	NVG_DST_ALPHA = 1<<8,
+	NVG_ONE_MINUS_DST_ALPHA = 1<<9,
+	NVG_SRC_ALPHA_SATURATE = 1<<10;
+
+// composite operation
+const int
+	NVG_SOURCE_OVER = 0,
+	NVG_SOURCE_IN = 1,
+	NVG_SOURCE_OUT = 2,
+	NVG_ATOP = 3,
+	NVG_DESTINATION_OVER = 4,
+	NVG_DESTINATION_IN = 5,
+	NVG_DESTINATION_OUT = 6,
+	NVG_DESTINATION_ATOP = 7,
+	NVG_LIGHTER = 8,
+	NVG_COPY = 9,
+	NVG_XOR = 10;
+
+// image flags
+const int
+  NVG_IMAGE_GENERATE_MIPMAPS	= 1<<0,     // Generate mipmaps during creation of the image.
+	NVG_IMAGE_REPEATX			= 1<<1,		// Repeat image in X direction.
+	NVG_IMAGE_REPEATY			= 1<<2,		// Repeat image in Y direction.
+	NVG_IMAGE_FLIPY				= 1<<3,		// Flips (inverses) image in Y direction when rendered.
+	NVG_IMAGE_PREMULTIPLIED		= 1<<4;		// Image data has premultiplied alpha.
+
+// Init
+int nvg_Init(int flags) {}
+void nvg_Finish() {}
+
+// Drawing
+void nvg_BeginFrame() {}
+void nvg_CancelFrame() {}
+void nvg_EndFrame() {}
+
+// Global composite operation
+void nvg_GlobalCompositeOperation(int op) {}
+void nvg_GlobalCompositeBlendFunc(int sfactor, int dfactor) {}
+void nvg_GlobalCompositeBlendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {}
+
+// State handling
+void nvg_Save() {}
+void nvg_Restore() {}
+void nvg_Reset() {}
+
+// Render styles
+void nvg_StrokeColor(float r, float g, float b, float a) {}
+void nvg_StrokePaint(xptr paint) {} // paint - result of Paints functions
+void nvg_FillColor(float r, float g, float b, float a) {}
+void nvg_FillPaint(xptr paint) {} // paint - result of Paints functions
+void nvg_MiterLimit(float limit) {}
+void nvg_StrokeWidth(float size) {}
+void nvg_LineCap(int cap) {}
+void nvg_LineJoin(int join) {}
+void nvg_GlobalAlpha(float alpha) {}
+
+// Transformations
+void nvg_ResetTransform() {}
+void nvg_Transform(float a, float b, float c, float d, float e, float f) {}
+void nvg_Translate(float x, float y) {}
+void nvg_Rotate(float angle) {}
+void nvg_SkewX(float angle) {}
+void nvg_SkewY(float angle) {}
+void nvg_Scale(float x, float y) {}
+
+// Images
+int nvg_CreateImage(string filename, int imageFlags) {}
+int nvg_CreateImageMem(int imageFlags, xptr data, int ndata) {}
+int nvg_CreateImageRGBA(int w, int h, int imageFlags, xptr data) {}
+void nvg_UpdateImage(int image, xptr data) {}
+void nvg_ImageSize(int image, ref int w, ref int h) {}
+void nvg_DeleteImage(int image) {}
+
+// Paints
+xptr nvg_LinearGradient(float sx, float sy, float ex, float ey,
+	float ir, float ig, float ib, float ia,
+	float or, float og, float ob, float oa) {}
+xptr nvg_BoxGradient(float x, float y, float w, float h, float r, float f,
+	float ir, float ig, float ib, float ia,
+	float or, float og, float ob, float oa) {}
+xptr nvg_RadialGradient(float cx, float cy, float inr, float outr,
+	float ir, float ig, float ib, float ia,
+	float or, float og, float ob, float oa) {}
+xptr nvg_ImagePattern(float ox, float oy, float ex, float ey,
+	float angle, int image, float alpha) {}
+void nvg_FreePaint(xptr paint) {}
+
+// Scissoring
+void nvg_Scissor(float x, float y, float w, float h) {}
+void nvg_IntersectScissor(float x, float y, float w, float h) {}
+void nvg_ResetScissor() {}
+
+// Paths
+void nvg_BeginPath() {}
+void nvg_MoveTo(float x, float y) {}
+void nvg_LineTo(float x, float y) {}
+void nvg_BezierTo(float c1x, float c1y, float c2x, float c2y, float x, float y) {}
+void nvg_QuadTo(float cx, float cy, float x, float y) {}
+void nvg_ArcTo(float x1, float y1, float x2, float y2, float radius) {}
+void nvg_ClosePath() {}
+void nvg_PathWinding(int dir) {}
+void nvg_Arc(float cx, float cy, float r, float a0, float a1, int dir) {}
+void nvg_Rect(float x, float y, float w, float h) {}
+void nvg_RoundedRect(float x, float y, float w, float h, float r) {}
+void nvg_RoundedRectVarying(float x, float y, float w, float h,
+	float radTopLeft, float radTopRight, float radBottomRight, float radBottomLeft) {}
+void nvg_Ellipse(float cx, float cy, float rx, float ry) {}
+void nvg_Circle(float cx, float cy, float r) {}
+void nvg_Fill() {}
+void nvg_Stroke() {}
+
+// Text
+int nvg_CreateFont(string name, string filename) {}
+int nvg_CreateFontMem(string name, xptr data, int ndata, int freeData) {}
+int nvg_FindFont(string name) {}
+int nvg_AddFallbackFontId(int baseFont, int fallbackFont) {}
+int nvg_AddFallbackFont(string baseFont, string fallbackFont) {}
+void nvg_FontSize(float size) {}
+void nvg_FontBlur(float blur) {}
+void nvg_TextLetterSpacing(float spacing) {}
+void nvg_TextLineHeight(float lineHeight) {}
+void nvg_TextAlign(int align) {}
+void nvg_FontFaceId(int font) {}
+void nvg_FontFace(string font) {}
+void nvg_Text(float x, float y, string str, string end) {}
+void nvg_TextBox(float x, float y, float breakRowWidth, string str, string end) {}
+float nvg_TextBounds(float x, float y, string str, string end, vec4 bounds) {}
+void nvg_TextBoxBounds(float x, float y, float breakRowWidth, string str, string end, vec4 bounds) {}
+void nvg_TextMetrics(ref float ascender, ref float descender, ref float lineh) {}
+
+// SVG support
+xptr nsvg_ParseFromFile(string filename, string units, float dpi) {}
+xptr nsvg_ParseMem(xptr data, int ndata, string units, float dpi) {}
+void nsvg_ImageSize(xptr image, ref float width, ref float height) {}
+void nsvg_Draw(xptr image, string idPrefix, float alpha) {}
+void nsvg_Rasterize(xptr image, float tx, float ty, float scale, xptr dst, int w, int h) {}
+void nsvg_Delete(xptr image) {}]]>
+      </Source>
+    </ZExternalLibrary>
+    <ZLibrary Comment="Globals">
+      <Source>
+<![CDATA[const float SCR_W = 16.0, SCR_H = 9.0;
+
+xptr SvgImage;
+float MidX, MidY, Scale, BubbleVolatility;]]>
+      </Source>
+    </ZLibrary>
+    <ZExpression Comment="Init">
+      <Expression>
+<![CDATA[nvg_Init(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+
+// read embedded resources
+float w, h;
+SvgImage = nsvg_ParseFromFile("octopus.svg", "px", 96);
+nsvg_ImageSize(SvgImage, w, h);
+
+Scale = 0.5 * App.ViewportHeight / h;
+MidX = (App.ViewportWidth- w*Scale) / 2;
+MidY = (App.ViewportHeight - h*Scale) / 2;
+BubbleVolatility = App.ViewportWidth / 20;]]>
+      </Expression>
+    </ZExpression>
+    <SetAppState State="MainAppState"/>
+  </OnLoaded>
+  <States>
+    <AppState Name="MainAppState" CollisionsEnabled="0">
+      <OnStart>
+        <SpawnModel Model="OctopusModel" SpawnStyle="1"/>
+      </OnStart>
+      <OnUpdate>
+        <Timer Interval="0.5">
+          <OnTimer>
+            <SpawnModel Model="BubbleModel"/>
+          </OnTimer>
+        </Timer>
+      </OnUpdate>
+      <OnRender>
+        <ZExpression>
+          <Expression>
+<![CDATA[xptr gradient;
+
+nvg_BeginFrame();
+nvg_BeginPath();
+nvg_Rect(0, 0, App.ViewportWidth, App.ViewportHeight);
+gradient = nvg_LinearGradient(0, 0, 0, App.ViewportHeight,
+  0.6, 1.0, 1.0, 1.0,
+  0.1, 0.3, 0.6, 1.0);
+nvg_FillPaint(gradient);
+nvg_Fill();
+nvg_EndFrame();]]>
+          </Expression>
+        </ZExpression>
+      </OnRender>
+    </AppState>
+  </States>
+  <OnClose>
+    <ZExpression>
+      <Expression>
+<![CDATA[nsvg_Delete(SvgImage);
+nvg_Finish();]]>
+      </Expression>
+    </ZExpression>
+  </OnClose>
+  <Content>
+    <Model Name="OctopusModel" Position="232.1903 88.9768 0">
+      <OnUpdate>
+        <ZExpression>
+          <Expression>
+<![CDATA[float t = App.Time;
+
+CurrentModel.Position.X = MidX + noise2(t, 17) * App.ViewportWidth * 0.1;
+CurrentModel.Position.Y = MidY + noise2(23, t) * App.ViewportHeight * 0.1;]]>
+          </Expression>
+        </ZExpression>
+      </OnUpdate>
+      <OnRender>
+        <ZExpression>
+          <Expression>
+<![CDATA[nvg_BeginFrame();
+nvg_Translate(CurrentModel.Position.X, CurrentModel.Position.Y);
+nvg_Scale(Scale, Scale);
+nsvg_Draw(SvgImage, "octo", 1.0);
+nvg_EndFrame();]]>
+          </Expression>
+        </ZExpression>
+      </OnRender>
+    </Model>
+    <Model Name="BubbleModel">
+      <Definitions>
+        <Variable Name="BubbleX"/>
+      </Definitions>
+      <OnSpawn>
+        <ZExpression>
+          <Expression>
+<![CDATA[CurrentModel.Scale.X = random(0.8, 0.6) * Scale;
+CurrentModel.Velocity.Y = random(App.ViewportHeight * -0.2, App.ViewportHeight * 0.1);
+BubbleX = rnd() * App.ViewportWidth;
+CurrentModel.Position.Y = App.ViewportHeight + 30;]]>
+          </Expression>
+        </ZExpression>
+      </OnSpawn>
+      <OnUpdate>
+        <ZExpression>
+          <Expression>
+<![CDATA[CurrentModel.Position.X = BubbleX +
+  noise2(CurrentModel.Personality * 100, CurrentModel.Position.Y * 0.01) * BubbleVolatility;
+
+if(CurrentModel.Position.Y < -30)
+  @RemoveModel();]]>
+          </Expression>
+        </ZExpression>
+      </OnUpdate>
+      <OnRender>
+        <ZExpression>
+          <Expression>
+<![CDATA[nvg_BeginFrame();
+nvg_Translate(CurrentModel.Position.X, CurrentModel.Position.Y);
+nvg_Scale(CurrentModel.Scale.X, CurrentModel.Scale.X);
+nsvg_Draw(SvgImage, "bubble", 1.0);
+nvg_EndFrame();]]>
+          </Expression>
+        </ZExpression>
+      </OnRender>
+    </Model>
+  </Content>
+</ZApplication>
