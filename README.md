@@ -6,3 +6,5 @@ Links:
 * Download compiled versions of the library from [here](https://github.com/Rado-1/ZgeNano/releases).
 * Related [forum discussion](http://www.emix8.org/forum/viewtopic.php?f=10&t=1292).
 * It is recommended to use the latest beta release of ZGameEditor downloaded from [here](http://www.zgameeditor.org/files/ZGameEditor_beta.zip).
+* [NanoVG API documentation](https://github.com/memononen/nanovg/blob/master/src/nanovg.h).
+* [NanoSVG API documentation](https://github.com/memononen/nanosvg/blob/master/src/nanosvg.h).
