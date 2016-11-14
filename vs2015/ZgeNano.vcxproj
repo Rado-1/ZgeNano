@@ -35,6 +35,8 @@
     <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
+    <UseOfMfc>Dynamic</UseOfMfc>
+    <CLRSupport>false</CLRSupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -42,7 +44,7 @@
     <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
-    <UseOfMfc>false</UseOfMfc>
+    <UseOfMfc>Static</UseOfMfc>
     <CLRSupport>false</CLRSupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -77,26 +79,26 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)\..\nanovg\build;$(ProjectDir)\..\..\glew-2.0.0\lib\Release\Win32;$(LibraryPath)</LibraryPath>
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(ProjectDir)\..\tinf\src;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)\..\nanovg\build;$(ProjectDir)\..\tinf\lib;$(ProjectDir)\..\..\glew-2.0.0\lib\Release\Win32;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\lib\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(ProjectDir)\..\tinf\src;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Rado1\CPP\glew-2.0.0\lib\Release\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)\..\nanovg\build;$(ProjectDir)\..\..\glew-2.0.0\lib\Release\Win32;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(ProjectDir)\..\tinf\src;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)\..\nanovg\build;$(ProjectDir)\..\tinf\lib;$(ProjectDir)\..\..\glew-2.0.0\lib\Release\Win32;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)..\lib\</OutDir>
     <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)\..\nanovg\src;$(ProjectDir)\..\nanosvg\src;$(ProjectDir)\..\..\glew-2.0.0\include;$(ProjectDir)\..\tinf\src;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Rado1\CPP\glew-2.0.0\lib\Release\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -108,12 +110,18 @@
       <SDLCheck>true</SDLCheck>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <CompileAsManaged>false</CompileAsManaged>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>NotSet</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>nanovg.lib;glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>nanovg.lib;glew32s.lib;opengl32.lib;tinf.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -147,7 +155,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>nanovg.lib;glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>nanovg.lib;glew32s.lib;opengl32.lib;tinf.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <AssemblyDebug>false</AssemblyDebug>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>

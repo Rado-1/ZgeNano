@@ -41,6 +41,9 @@ misrepresented as being the original software.
 
 // Includes
 
+#include <stdlib.h>
+#include <stdio.h>
+
 //#ifdef _WIN32
 #define GLEW_STATIC
 #include<GL/glew.h>
@@ -60,6 +63,8 @@ misrepresented as being the original software.
 #define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvgrast.h"
 
+#include "tinf.h"
+
 
 // Globals
 
@@ -67,6 +72,7 @@ struct NVGcontext* vg;
 int winWidth, winHeight;
 float devicePixelRatio;
 struct NSVGrasterizer* rasterizer = NULL;
+bool initializeTinf = true;
 
 
 // Auxiliary
@@ -78,7 +84,6 @@ inline NVGcolor COLOR(float r, float g, float b, float a) {
 inline NVGcolor SVGCOLOR(unsigned int c, float opacity) {
 	return nvgRGBA(c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF, ((c >> 24) & 0xFF) * opacity);
 }
-
 
 
 // Init
@@ -451,7 +456,65 @@ EXPORT void nvg_TextMetrics(float* ascender, float* descender, float* lineh) {
 // SVG support
 
 EXPORT NSVGimage* nsvg_ParseFromFile(const char* filename, const char* units, float dpi) {
-	return nsvgParseFromFile(filename, units, dpi);
+	
+	if((strstr(filename, ".svgz") - filename) != (strlen(filename) - 5))
+		// parse SVG file
+		return nsvgParseFromFile(filename, units, dpi);
+	else {
+		// parse SVGZ file (compressed SVG)
+
+		// lazy initialization of tinf
+		if (initializeTinf) {
+			tinf_init();
+			initializeTinf = false;
+		}
+
+		FILE* fp = NULL;
+		size_t size;
+		unsigned char* data = NULL;
+		NSVGimage* image = NULL;
+		unsigned char* svgData = NULL;
+		unsigned int svgSize;
+
+		// read file
+		fp = fopen(filename, "rb");
+		if (!fp) goto error;
+		fseek(fp, 0, SEEK_END);
+		size = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		data = (unsigned char*)malloc(size);
+		if (data == NULL) goto error;
+		if (fread(data, 1, size, fp) != size) goto error;
+		fclose(fp);
+
+		// get decompressed length
+		svgSize =				  data[size - 1];
+		svgSize = 256 * svgSize + data[size - 2];
+		svgSize = 256 * svgSize + data[size - 3];
+		svgSize = 256 * svgSize + data[size - 4];
+
+		svgData = (unsigned char*)malloc(svgSize + 1);
+		if (svgData == NULL) goto error;
+
+		// uncompress
+		if (tinf_gzip_uncompress(svgData, &svgSize, data, size) != TINF_OK) goto error;
+		free(data);
+
+		// SVG must be null terminated
+		svgData[svgSize] = '\0';
+
+		image = nsvgParse((char*)svgData, units, dpi);
+		free(svgData);
+
+		return image;
+
+	error:
+		if (fp) fclose(fp);
+		if (data) free(data);
+		if (svgData) free(svgData);
+		if (image) nsvgDelete(image);
+		return NULL;
+	}
 }
 
 EXPORT NSVGimage* nsvg_ParseMem(unsigned char* data, int ndata, const char* units, float dpi) {
