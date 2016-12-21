@@ -6,7 +6,7 @@ ZZDC<?xml version="1.0" encoding="iso-8859-1" ?>
   build on NanoVG: https://github.com/memononen/nanovg
   and NanoSVG: https://github.com/memononen/nanosvg
 
-  Version: 0.1 (2016-10-22)
+  Version: 1.0 (2016-12-21)
 
   Download Windows DLL and Android shared library from
   https://github.com/Rado-1/ZgeNano/releases
