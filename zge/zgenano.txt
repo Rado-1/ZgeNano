@@ -23,6 +23,11 @@ const int
 	NVG_STENCIL_STROKES = 1<<1,
 	NVG_DEBUG = 1<<2;
 
+// winding (direction of arcs)
+const int
+  NVG_CCW = 1, // counter-clockwise
+  NVG_CW = 2; // clockwise
+
 // solidity
 const int
   NVG_SOLID = 1,
