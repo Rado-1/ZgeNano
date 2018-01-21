@@ -1,12 +1,12 @@
 ZZDC<?xml version="1.0" encoding="iso-8859-1" ?>
-<ZExternalLibrary Comment="ZgeNano vector graphics library" ModuleName="ZgeNano" CallingConvention="1">
+<ZExternalLibrary Comment="Vector graphics library" ModuleName="ZgeNano" CallingConvention="1">
   <Source>
 <![CDATA[/*
   ZgeNano Library; vector graphics rendering library
   build on NanoVG: https://github.com/memononen/nanovg
   and NanoSVG: https://github.com/memononen/nanosvg
 
-  Version: 1.0 (2016-12-21)
+  Version: 1.1 (2018-01-20)
 
   Download Windows DLL and Android shared library from
   https://github.com/Rado-1/ZgeNano/releases
@@ -14,7 +14,7 @@ ZZDC<?xml version="1.0" encoding="iso-8859-1" ?>
   Project home
   https://github.com/Rado-1/ZgeNano
 
-  Copyright (c) 2016 Radovan Cervenka
+  Copyright (c) 2016-2018 Radovan Cervenka
 */
 
 // init flags
@@ -90,8 +90,10 @@ const int
 	NVG_IMAGE_PREMULTIPLIED		= 1<<4;		// Image data has premultiplied alpha.
 
 // Init
-int nvg_Init(int flags) {}
-void nvg_Finish() {}
+xptr nvg_Init(int flags, xptr contextKey) {}
+void nvg_SetContext(xptr context) {}
+void nvg_Finish(xptr context) {}
+void nvg_SetViewport() {}
 
 // Drawing
 void nvg_BeginFrame() {}
@@ -173,6 +175,7 @@ void nvg_Ellipse(float cx, float cy, float rx, float ry) {}
 void nvg_Circle(float cx, float cy, float r) {}
 void nvg_Fill() {}
 void nvg_Stroke() {}
+void vg_StrokeNoScale() {}
 
 // Text
 int nvg_CreateFont(string name, string filename) {}
@@ -197,7 +200,7 @@ void nvg_TextMetrics(ref float ascender, ref float descender, ref float lineh) {
 xptr nsvg_ParseFromFile(string filename, string units, float dpi) {}
 xptr nsvg_ParseMem(xptr data, int ndata, string units, float dpi) {}
 void nsvg_ImageSize(xptr image, ref float width, ref float height) {}
-void nsvg_Draw(xptr image, string idPrefix, float alpha) {}
+void nsvg_Draw(xptr image, string shapeIdPrefix, int strokeWidthScaling, float strokeWidthFactor, xptr color) {}
 void nsvg_Rasterize(xptr image, float tx, float ty, float scale, xptr dst, int w, int h) {}
 void nsvg_Delete(xptr image) {}]]>
   </Source>

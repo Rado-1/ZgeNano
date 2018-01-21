@@ -236,8 +236,7 @@ for(int x = 0; x <= SCREEN_WIDTH; ++x)
     BgArray[x, y, 3] = 0.5 + b*2; // G
     BgArray[x, y, 4] = 0.5 - a - b; // B
 
-  }
-*/]]>
+  }]]>
           </Expression>
         </ZExpression>
       </OnUpdate>

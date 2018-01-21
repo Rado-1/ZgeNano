@@ -13,6 +13,8 @@
 *.depend
 *.layout
 nanovg/
+!nanovg/src/nanovg.h
+!nanovg/src/nanovg.c
 nanosvg/
 nanogui/
 tinf/
@@ -23,6 +25,7 @@ android/obj/
 obj/
 com.rado1.*/
 *downloads/
+*.vs/
 Release/
 Debug/
 ipch/

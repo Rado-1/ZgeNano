@@ -1,6 +1,6 @@
 /*
 ZgeNano Library
-Copyright (c) 2016 Radovan Cervenka
+Copyright (c) 2016-2018 Radovan Cervenka
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
@@ -22,6 +22,7 @@ misrepresented as being the original software.
 */
 
 /// The main file used to compile Windows DLL and Android shared library
+/// Version: 1.1 (2018 - 01 - 09)
 
 
 // Definitions
@@ -43,6 +44,8 @@ misrepresented as being the original software.
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unordered_map>
+#include <vector>
 
 //#ifdef _WIN32
 #define GLEW_STATIC
@@ -65,48 +68,124 @@ misrepresented as being the original software.
 
 #include "tinf.h"
 
+// Types
 
-// Globals
+/* ZgeNano execution context. */
+struct ZNVGcontext {
 
-struct NVGcontext* vg;
-int winWidth, winHeight;
-float devicePixelRatio;
-struct NSVGrasterizer* rasterizer = NULL;
-bool initializeTinf = true;
+	ZNVGcontext(NVGcontext* vg) :
+		vg(vg),
+		winWidth(0),
+		winHeight(0),
+		rasterizer(NULL) {}
+
+	~ZNVGcontext() {
+		if (rasterizer != NULL)
+			nsvgDeleteRasterizer(rasterizer);
+
+		// delete images
+		for (auto iter = images.begin(); iter != images.end(); ++iter) {
+			nvgDeleteImage(vg, *iter);
+		}
+
+		// delete paints
+		for (auto iter = paints.begin(); iter != paints.end(); ++iter) {
+			if (*iter != NULL)
+				delete(*iter);
+		}
+
+		// delete SVG images
+		for (auto iter = svgImages.begin(); iter != svgImages.end(); ++iter) {
+			delete(*iter);
+		}
+
+		nvgDeleteGL2(vg);
+	}
+
+	struct NVGcontext* vg;
+	int winWidth, winHeight;
+	float devicePixelRatio;
+	struct NSVGrasterizer* rasterizer;
+
+	// allocated resources deleted on destruction
+	std::vector<int> images;
+	std::vector<NVGpaint*> paints;
+	std::vector<NSVGimage*> svgImages;
+};
 
 
 // Auxiliary
+
+template <typename T> inline void remove(std::vector<T> &vec, T element) {
+	auto it = std::find(vec.begin(), vec.end(), element);
+	if (it != vec.end()) {
+		std::swap(*it, vec.back());
+		vec.pop_back();
+	}
+}
 
 inline NVGcolor COLOR(float r, float g, float b, float a) {
 	return nvgRGBAf(r, g, b, a);
 }
 
-inline NVGcolor SVGCOLOR(unsigned int c, float opacity) {
-	return nvgRGBA(c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF, ((c >> 24) & 0xFF) * opacity);
+inline NVGcolor SVGCOLOR(unsigned int c, float r, float g, float b, float a) {
+	return nvgRGBA((c & 0xFF) * r, ((c >> 8) & 0xFF) * g, ((c >> 16) & 0xFF) * b, ((c >> 24) & 0xFF) * a);
 }
+
+// Globals
+
+ZNVGcontext* currentContext;
+std::unordered_map<void*, ZNVGcontext*> contexts;
+GLint viewport[4];
+bool initializeTinf = true;
 
 
 // Init
 
-EXPORT int nvg_Init(int flags) {
-	if (glewInit() != GLEW_OK) return ERROR;
-
-	vg = nvgCreateGL2(flags);
-	if (vg == NULL) return ERROR;
-
-	GLint m_viewport[4];
-	glGetIntegerv(GL_VIEWPORT, m_viewport);
-	winWidth = m_viewport[2];
-	winHeight = m_viewport[3];
-	devicePixelRatio = static_cast<float> (winWidth / winHeight);
-
-	return DONE;
+EXPORT void nvg_SetViewport() {
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	currentContext->winWidth = viewport[2];
+	currentContext->winHeight = viewport[3];
+	currentContext->devicePixelRatio = viewport[3] != 0 ? (float) viewport[2] / (float) viewport[3] : 0;
 }
 
-EXPORT void nvg_Finish() {
-	if (rasterizer != NULL)
-		nsvgDeleteRasterizer(rasterizer);
-	nvgDeleteGL2(vg);
+EXPORT void nvg_SetContext(ZNVGcontext* context) {
+	currentContext = context;
+}
+
+EXPORT ZNVGcontext* nvg_Init(int flags, void* contextKey) {
+
+	auto search = contexts.find(contextKey);
+
+	if (search == contexts.end()) {
+		// context not found => create new one
+		struct NVGcontext* vg;
+
+		if (glewInit() != GLEW_OK) return NULL;
+		vg = nvgCreateGL2(flags);
+		if (vg == NULL) return NULL;
+
+		currentContext = new ZNVGcontext(vg);
+
+		contexts.insert({ contextKey, currentContext });
+		nvg_SetViewport();
+	} else {
+		// context already exist
+		currentContext = search->second;
+	}
+
+	return currentContext;
+}
+
+EXPORT void nvg_Finish(ZNVGcontext* context) {
+	auto current = contexts.begin();
+
+	for (auto iter = contexts.begin(); iter != contexts.end(); ++iter)
+		if (iter->second == context) {
+			delete iter->second;
+			contexts.erase(iter);
+			break;
+		}
 }
 
 
@@ -114,16 +193,16 @@ EXPORT void nvg_Finish() {
 
 EXPORT void nvg_BeginFrame() {
 	glPushAttrib(GL_DEPTH_BUFFER_BIT);
-	nvgBeginFrame(vg, winWidth, winHeight, devicePixelRatio);
+	nvgBeginFrame(currentContext->vg , currentContext->winWidth, currentContext->winHeight, currentContext->devicePixelRatio);
 }
 
 EXPORT void nvg_CancelFrame() {
-	nvgCancelFrame(vg);
+	nvgCancelFrame(currentContext->vg);
 	glPopAttrib();
 }
 
 EXPORT void nvg_EndFrame() {
-	nvgEndFrame(vg);
+	nvgEndFrame(currentContext->vg);
 	glPopAttrib();
 }
 
@@ -131,100 +210,100 @@ EXPORT void nvg_EndFrame() {
 // Global composite operation
 
 EXPORT void nvg_GlobalCompositeOperation(int op) {
-	nvgGlobalCompositeOperation(vg ,op);
+	nvgGlobalCompositeOperation(currentContext->vg,op);
 }
 
 EXPORT void nvg_GlobalCompositeBlendFunc(int sfactor, int dfactor) {
-	nvgGlobalCompositeBlendFunc(vg, sfactor, dfactor);
+	nvgGlobalCompositeBlendFunc(currentContext->vg, sfactor, dfactor);
 }
 
 EXPORT void nvg_GlobalCompositeBlendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
-	nvgGlobalCompositeBlendFuncSeparate(vg, srcRGB, dstRGB, srcAlpha, dstAlpha);
+	nvgGlobalCompositeBlendFuncSeparate(currentContext->vg, srcRGB, dstRGB, srcAlpha, dstAlpha);
 }
 
 
 // State handling
 
 EXPORT void nvg_Save() {
-	nvgSave(vg);
+	nvgSave(currentContext->vg);
 }
 
 EXPORT void nvg_Restore() {
-	nvgRestore(vg);
+	nvgRestore(currentContext->vg);
 }
 
 EXPORT void nvg_Reset() {
-	nvgReset(vg);
+	nvgReset(currentContext->vg);
 }
 
 
 // Render styles
 
 EXPORT void nvg_StrokeColor(float r, float g, float b, float a) {
-	nvgStrokeColor(vg, COLOR(r, g, b, a));
+	nvgStrokeColor(currentContext->vg, COLOR(r, g, b, a));
 }
 
 EXPORT void nvg_StrokePaint(NVGpaint paint) {
-	nvgStrokePaint(vg, paint);
+	nvgStrokePaint(currentContext->vg, paint);
 }
 
 EXPORT void nvg_FillColor(float r, float g, float b, float a) {
-	nvgFillColor(vg, COLOR(r, g, b, a));
+	nvgFillColor(currentContext->vg, COLOR(r, g, b, a));
 }
 
 EXPORT void nvg_FillPaint(NVGpaint* paint) {
-	nvgFillPaint(vg, *paint);
+	nvgFillPaint(currentContext->vg, *paint);
 }
 
 EXPORT void nvg_MiterLimit(float limit) {
-	nvgMiterLimit(vg, limit);
+	nvgMiterLimit(currentContext->vg, limit);
 }
 
 EXPORT void nvg_StrokeWidth(float size) {
-	nvgStrokeWidth(vg, size);
+	nvgStrokeWidth(currentContext->vg, size);
 }
 
 EXPORT void nvg_LineCap(int cap) {
-	nvgLineCap(vg, cap);
+	nvgLineCap(currentContext->vg, cap);
 }
 
 EXPORT void nvg_LineJoin(int join) {
-	nvgLineJoin(vg, join);
+	nvgLineJoin(currentContext->vg, join);
 }
 
 EXPORT void nvg_GlobalAlpha(float alpha) {
-	nvgGlobalAlpha(vg, alpha);
+	nvgGlobalAlpha(currentContext->vg, alpha);
 }
 
 
 // Transformations
 
 EXPORT void nvg_ResetTransform() {
-	nvgResetTransform(vg);
+	nvgResetTransform(currentContext->vg);
 }
 
 EXPORT void nvg_Transform(float a, float b, float c, float d, float e, float f) {
-	nvgTransform(vg, a, b, c, d, e, f);
+	nvgTransform(currentContext->vg, a, b, c, d, e, f);
 }
 
 EXPORT void nvg_Translate(float x, float y) {
-	nvgTranslate(vg, x, y);
+	nvgTranslate(currentContext->vg, x, y);
 }
 
 EXPORT void nvg_Rotate(float angle) {
-	nvgRotate(vg, angle);
+	nvgRotate(currentContext->vg, angle);
 }
 
 EXPORT void nvg_SkewX(float angle) {
-	nvgSkewX(vg, angle);
+	nvgSkewX(currentContext->vg, angle);
 }
 
 EXPORT void nvg_SkewY(float angle) {
-	nvgSkewY(vg, angle);
+	nvgSkewY(currentContext->vg, angle);
 }
 
 EXPORT void nvg_Scale(float x, float y) {
-	nvgScale(vg, x, y);
+	nvgScale(currentContext->vg, x, y);
 }
 
 // Note: Functions for working with float[6] matrices are not included (yet).
@@ -233,27 +312,34 @@ EXPORT void nvg_Scale(float x, float y) {
 // Images
 
 EXPORT int nvg_CreateImage(const char* filename, int imageFlags) {
-	return nvgCreateImage(vg, filename, imageFlags);
+	int i = nvgCreateImage(currentContext->vg, filename, imageFlags);
+	currentContext->images.push_back(i);
+	return i;
 }
 
 EXPORT int nvg_CreateImageMem(int imageFlags, unsigned char* data, int ndata) {
-	return nvgCreateImageMem(vg, imageFlags, data, ndata);
+	int i = nvgCreateImageMem(currentContext->vg, imageFlags, data, ndata);
+	currentContext->images.push_back(i);
+	return i;
 }
 
 EXPORT int nvg_CreateImageRGBA(int w, int h, int imageFlags, const unsigned char* data) {
-	return nvgCreateImageRGBA(vg, w, h, imageFlags, data);
+	int i = nvgCreateImageRGBA(currentContext->vg, w, h, imageFlags, data);
+	currentContext->images.push_back(i);
+	return i;
 }
 
 EXPORT void nvg_UpdateImage(int image, const unsigned char* data) {
-	nvgUpdateImage(vg, image, data);
+	nvgUpdateImage(currentContext->vg, image, data);
 }
 
 EXPORT void nvg_ImageSize(int image, int* w, int* h) {
-	nvgImageSize(vg, image, w, h);
+	nvgImageSize(currentContext->vg, image, w, h);
 }
 
 EXPORT void nvg_DeleteImage(int image) {
-	nvgDeleteImage(vg, image);
+	remove(currentContext->images, image);
+	nvgDeleteImage(currentContext->vg, image);
 }
 
 
@@ -263,7 +349,8 @@ EXPORT NVGpaint* nvg_LinearGradient(float sx, float sy, float ex, float ey,
 	float ir, float ig, float ib, float ia,
 	float or, float og, float ob, float oa) {
 
-	NVGpaint* ret = new NVGpaint(nvgLinearGradient(vg, sx, sy, ex, ey, COLOR(ir, ig, ib, ia), COLOR(or , og, ob, oa)));
+	NVGpaint* ret = new NVGpaint(nvgLinearGradient(currentContext->vg, sx, sy, ex, ey, COLOR(ir, ig, ib, ia), COLOR(or , og, ob, oa)));
+	currentContext->paints.push_back(ret);
 	return ret;
 }
 
@@ -271,7 +358,8 @@ EXPORT NVGpaint* nvg_BoxGradient(float x, float y, float w, float h, float r, fl
 	float ir, float ig, float ib, float ia,
 	float or, float og, float ob, float oa) {
 
-	NVGpaint* ret = new NVGpaint(nvgBoxGradient(vg, x, y, w, h, r, f, COLOR(ir, ig, ib, ia), COLOR(or , og, ob, oa)));
+	NVGpaint* ret = new NVGpaint(nvgBoxGradient(currentContext->vg, x, y, w, h, r, f, COLOR(ir, ig, ib, ia), COLOR(or , og, ob, oa)));
+	currentContext->paints.push_back(ret);
 	return ret;
 }
 
@@ -279,174 +367,183 @@ EXPORT NVGpaint* nvg_RadialGradient(float cx, float cy, float inr, float outr,
 	float ir, float ig, float ib, float ia,
 	float or, float og, float ob, float oa) {
 
-	NVGpaint* ret = new NVGpaint(nvgRadialGradient(vg, cx, cy, inr, outr, COLOR(ir, ig, ib, ia), COLOR(or , og, ob, oa)));
+	NVGpaint* ret = new NVGpaint(nvgRadialGradient(currentContext->vg, cx, cy, inr, outr, COLOR(ir, ig, ib, ia), COLOR(or , og, ob, oa)));
+	currentContext->paints.push_back(ret);
 	return ret;
 }
 
 EXPORT NVGpaint* nvg_ImagePattern(float ox, float oy, float ex, float ey,
 	float angle, int image, float alpha) {
 
-	NVGpaint* ret = new NVGpaint(nvgImagePattern(vg, ox, oy, ex, ey, angle, image, alpha));
+	NVGpaint* ret = new NVGpaint(nvgImagePattern(currentContext->vg, ox, oy, ex, ey, angle, image, alpha));
+	currentContext->paints.push_back(ret);
 	return ret;
 }
 
 EXPORT void nvg_FreePaint(NVGpaint* paint) {
-	delete paint;
+	if (paint != NULL) {
+		remove(currentContext->paints, paint);
+		delete paint;
+	}
 }
 
 
 // Scissoring
 
 EXPORT void nvg_Scissor(float x, float y, float w, float h) {
-	nvgScissor(vg, x, y, w, h);
+	nvgScissor(currentContext->vg, x, y, w, h);
 }
 
 EXPORT void nvg_IntersectScissor(float x, float y, float w, float h) {
-	nvgIntersectScissor(vg, x, y, w, h);
+	nvgIntersectScissor(currentContext->vg, x, y, w, h);
 }
 
 EXPORT void nvg_ResetScissor() {
-	nvgResetScissor(vg);
+	nvgResetScissor(currentContext->vg);
 }
 
 
 // Paths
 
 EXPORT void nvg_BeginPath() {
-	nvgBeginPath(vg);
+	nvgBeginPath(currentContext->vg);
 }
 
 EXPORT void nvg_MoveTo(float x, float y) {
-	nvgMoveTo(vg, x, y);
+	nvgMoveTo(currentContext->vg, x, y);
 }
 
 EXPORT void nvg_LineTo(float x, float y) {
-	nvgLineTo(vg, x, y);
+	nvgLineTo(currentContext->vg, x, y);
 }
 
 EXPORT void nvg_BezierTo(float c1x, float c1y, float c2x, float c2y, float x, float y) {
-	nvgBezierTo(vg, c1x, c1y, c2x, c2y, x, y);
+	nvgBezierTo(currentContext->vg, c1x, c1y, c2x, c2y, x, y);
 }
 
 EXPORT void nvg_QuadTo(float cx, float cy, float x, float y) {
-	nvgQuadTo(vg, cx, cy, x, y);
+	nvgQuadTo(currentContext->vg, cx, cy, x, y);
 }
 
 EXPORT void nvg_ArcTo(float x1, float y1, float x2, float y2, float radius) {
-	nvgArcTo(vg, x1, y1, x2, y2, radius);
+	nvgArcTo(currentContext->vg, x1, y1, x2, y2, radius);
 }
 
 EXPORT void nvg_ClosePath() {
-	nvgClosePath(vg);
+	nvgClosePath(currentContext->vg);
 }
 
 EXPORT void nvg_PathWinding(int dir) {
-	nvgPathWinding(vg, dir);
+	nvgPathWinding(currentContext->vg, dir);
 }
 
 EXPORT void nvg_Arc(float cx, float cy, float r, float a0, float a1, int dir) {
-	nvgArc(vg, cx, cy, r, a0, a1, dir);
+	nvgArc(currentContext->vg, cx, cy, r, a0, a1, dir);
 }
 
 EXPORT void nvg_Rect(float x, float y, float w, float h) {
-	nvgRect(vg, x, y, w, h);
+	nvgRect(currentContext->vg, x, y, w, h);
 }
 
 EXPORT void nvg_RoundedRect(float x, float y, float w, float h, float r) {
-	nvgRoundedRect(vg, x, y, w, h, r);
+	nvgRoundedRect(currentContext->vg, x, y, w, h, r);
 }
 
 EXPORT void nvg_RoundedRectVarying(float x, float y, float w, float h,
 	float radTopLeft, float radTopRight, float radBottomRight, float radBottomLeft) {
 	
-	nvgRoundedRectVarying(vg, x, y, w, h, radTopLeft, radTopRight, radBottomRight, radBottomLeft);
+	nvgRoundedRectVarying(currentContext->vg, x, y, w, h, radTopLeft, radTopRight, radBottomRight, radBottomLeft);
 }
 
 EXPORT void nvg_Ellipse(float cx, float cy, float rx, float ry) {
-	nvgEllipse(vg, cx, cy, rx, ry);
+	nvgEllipse(currentContext->vg, cx, cy, rx, ry);
 }
 
 EXPORT void nvg_Circle(float cx, float cy, float r) {
-	nvgCircle(vg, cx, cy, r);
+	nvgCircle(currentContext->vg, cx, cy, r);
 }
 
 EXPORT void nvg_Fill() {
-	nvgFill(vg);
+	nvgFill(currentContext->vg);
 }
 
 EXPORT void nvg_Stroke() {
-	nvgStroke(vg);
+	nvgStroke(currentContext->vg);
+}
+
+EXPORT void nvg_StrokeNoScale() {
+	nvgStrokeNoScale(currentContext->vg);
 }
 
 
 // Text
 
 EXPORT int nvg_CreateFont(const char* name, const char* filename) {
-	return nvgCreateFont(vg, name, filename);
+	return nvgCreateFont(currentContext->vg, name, filename);
 }
 
 EXPORT int nvg_CreateFontMem(const char* name, unsigned char* data, int ndata, int freeData) {
-	return nvgCreateFontMem(vg, name, data, ndata, freeData);
+	return nvgCreateFontMem(currentContext->vg, name, data, ndata, freeData);
 }
 
 EXPORT int nvg_FindFont(const char* name) {
-	return nvgFindFont(vg, name);
+	return nvgFindFont(currentContext->vg, name);
 }
 
 EXPORT int nvg_AddFallbackFontId(int baseFont, int fallbackFont) {
-	return nvgAddFallbackFontId(vg, baseFont, fallbackFont);
+	return nvgAddFallbackFontId(currentContext->vg, baseFont, fallbackFont);
 }
 
 EXPORT int nvg_AddFallbackFont(const char* baseFont, const char* fallbackFont) {
-	return nvgAddFallbackFont(vg, baseFont, fallbackFont);
+	return nvgAddFallbackFont(currentContext->vg, baseFont, fallbackFont);
 }
 
 EXPORT void nvg_FontSize(float size) {
-	nvgFontSize(vg, size);
+	nvgFontSize(currentContext->vg, size);
 }
 
 EXPORT void nvg_FontBlur(float blur) {
-	nvgFontBlur(vg, blur);
+	nvgFontBlur(currentContext->vg, blur);
 }
 
 EXPORT void nvg_TextLetterSpacing(float spacing) {
-	nvgTextLetterSpacing(vg, spacing);
+	nvgTextLetterSpacing(currentContext->vg, spacing);
 }
 
 EXPORT void nvg_TextLineHeight(float lineHeight) {
-	nvgTextLineHeight(vg, lineHeight);
+	nvgTextLineHeight(currentContext->vg, lineHeight);
 }
 
 EXPORT void nvg_TextAlign(int align) {
-	nvgTextAlign(vg, align);
+	nvgTextAlign(currentContext->vg, align);
 }
 
 EXPORT void nvg_FontFaceId(int font) {
-	nvgFontFaceId(vg, font);
+	nvgFontFaceId(currentContext->vg, font);
 }
 
 EXPORT void nvg_FontFace(const char* font) {
-	nvgFontFace(vg, font);
+	nvgFontFace(currentContext->vg, font);
 }
 
 EXPORT void nvg_Text(float x, float y, const char* str, const char* end) {
-	nvgText(vg, x, y, str, end);
+	nvgText(currentContext->vg, x, y, str, end);
 }
 
 EXPORT void nvg_TextBox(float x, float y, float breakRowWidth, const char* str, const char* end) {
-	nvgTextBox(vg, x, y, breakRowWidth, str, end);
+	nvgTextBox(currentContext->vg, x, y, breakRowWidth, str, end);
 }
 
 EXPORT float nvg_TextBounds(float x, float y, const char* str, const char* end, float* bounds) {
-	return nvgTextBounds(vg, x, y, str, end, bounds);
+	return nvgTextBounds(currentContext->vg, x, y, str, end, bounds);
 }
 
 EXPORT void nvg_TextBoxBounds(float x, float y, float breakRowWidth, const char* str, const char* end, float* bounds) {
-	nvgTextBoxBounds(vg, x, y, breakRowWidth, str, end, bounds);
+	nvgTextBoxBounds(currentContext->vg, x, y, breakRowWidth, str, end, bounds);
 }
 
 EXPORT void nvg_TextMetrics(float* ascender, float* descender, float* lineh) {
-	nvgTextMetrics(vg, ascender, descender, lineh);
+	nvgTextMetrics(currentContext->vg, ascender, descender, lineh);
 }
 
 // Note: nvgTextGlyphPositions and nvgTextBreakLines are not supported due to relatively
@@ -526,7 +623,7 @@ EXPORT NSVGimage* nsvg_ParseMem(unsigned char* data, int ndata, const char* unit
 	return ret;
 }
 
-NVGpaint createLinearGradient(NSVGgradient* gradient, float alpha) {
+NVGpaint createLinearGradient(NSVGgradient* gradient, float r, float g, float b, float a) {
 	float inverse[6];
 	float sx, sy, ex, ey;
 
@@ -534,12 +631,12 @@ NVGpaint createLinearGradient(NSVGgradient* gradient, float alpha) {
 	nvgTransformPoint(&sx, &sy, inverse, 0, 0);
 	nvgTransformPoint(&ex, &ey, inverse, 0, 1);
 
-	return nvgLinearGradient(vg, sx, sy, ex, ey,
-		SVGCOLOR(gradient->stops[0].color, alpha),
-		SVGCOLOR(gradient->stops[gradient->nstops - 1].color, alpha));
+	return nvgLinearGradient(currentContext->vg, sx, sy, ex, ey,
+		SVGCOLOR(gradient->stops[0].color, r, g, b, a),
+		SVGCOLOR(gradient->stops[gradient->nstops - 1].color, r, g, b, a));
 }
 
-NVGpaint createRadialGradient(NSVGgradient* gradient, float alpha) {
+NVGpaint createRadialGradient(NSVGgradient* gradient, float r, float g, float b, float a) {
 	float inverse[6];
 	float cx, cy, r1, r2, inr, outr;
 
@@ -552,9 +649,9 @@ NVGpaint createRadialGradient(NSVGgradient* gradient, float alpha) {
 	else
 		inr = 0;
 
-	NVGpaint paint = nvgRadialGradient(vg, cx, cy, inr, outr,
-		SVGCOLOR(gradient->stops[0].color, alpha),
-		SVGCOLOR(gradient->stops[gradient->nstops - 1].color, alpha));
+	NVGpaint paint = nvgRadialGradient(currentContext->vg, cx, cy, inr, outr,
+		SVGCOLOR(gradient->stops[0].color, r, g, b, a),
+		SVGCOLOR(gradient->stops[gradient->nstops - 1].color, r, g, g, a));
 	
 	return  paint;
 }
@@ -564,8 +661,17 @@ EXPORT void nsvg_ImageSize(NSVGimage* image, float &width, float &height) {
 	height = image->height;
 }
 
-EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPrefix, float alpha) {
-	int cap;
+EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPrefix, int strokeWidthScaling, float strokeWidthFactor, float* color) {
+	int join, cap;
+	float r, g, b, a;
+	
+	if (color == NULL) {
+		r = g = b = a = 1.0;
+	} else {
+		r = color[0];
+		g = color[1]; b = color[2];
+		a = color[3];
+	}
 
 	// iterate shapes
 	for (NSVGshape *shape = image->shapes; shape != NULL; shape = shape->next) {
@@ -577,79 +683,90 @@ EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPrefix, float alpha) {
 		if (shapeIdPrefix != NULL &&
 			strncmp(shapeIdPrefix, shape->id, strlen(shapeIdPrefix))) continue;
 
-		nvgBeginPath(vg);
+		nvgBeginPath(currentContext->vg);
 		bool pathHole = false;
 
 		// draw paths
 		for (NSVGpath *path = shape->paths; path != NULL; path = path->next) {
 
-			nvgMoveTo(vg, path->pts[0], path->pts[1]);
-
-			for (int i = 0; i < path->npts - 1; i += 3) {
-				float* p = &path->pts[i * 2];
-				nvgBezierTo(vg, p[2], p[3], p[4], p[5], p[6], p[7]);
-			}
-
 			if (pathHole)
-				nvgPathWinding(vg, NVG_HOLE);
+				nvgPathWinding(currentContext->vg, NVG_HOLE);
 			else
 				pathHole = true;
 
+			nvgMoveTo(currentContext->vg, path->pts[0], path->pts[1]);
+
+			for (int i = 0; i < path->npts - 1; i += 3) {
+				float* p = &path->pts[i * 2];
+				nvgBezierTo(currentContext->vg, p[2], p[3], p[4], p[5], p[6], p[7]);
+			}
+
 			if (path->closed)
-				nvgLineTo(vg, path->pts[0], path->pts[1]);
+				nvgLineTo(currentContext->vg, path->pts[0], path->pts[1]);
 		}
 
-		// set fill
+		// fill
 		switch (shape->fill.type) {
 		case NSVG_PAINT_COLOR:
-			nvgFillColor(vg, SVGCOLOR(shape->fill.color, shape->opacity * alpha));
-			nvgFill(vg);
+			nvgFillColor(currentContext->vg, SVGCOLOR(shape->fill.color, r, g, b, shape->opacity * a));
+			nvgFill(currentContext->vg);
 			break;
 		case NSVG_PAINT_LINEAR_GRADIENT:
-			nvgFillPaint(vg, createLinearGradient(shape->fill.gradient, alpha));
-			nvgFill(vg);
+			nvgFillPaint(currentContext->vg, createLinearGradient(shape->fill.gradient, r, g, b, shape->opacity * a));
+			nvgFill(currentContext->vg);
 			break;
 		case NSVG_PAINT_RADIAL_GRADIENT:
-			nvgFillPaint(vg, createRadialGradient(shape->fill.gradient, alpha));
-			nvgFill(vg);
+			nvgFillPaint(currentContext->vg, createRadialGradient(shape->fill.gradient, r, g, b, shape->opacity * a));
+			nvgFill(currentContext->vg);
 			break;
 		}
 
 		// set stroke/line
-		nvgStrokeWidth(vg, shape->strokeWidth);
+		switch (shape->strokeLineJoin) {
+			case NSVG_JOIN_ROUND: join = NVG_ROUND; break;
+			case NSVG_JOIN_BEVEL: join = NVG_BEVEL; break;
+			case NSVG_JOIN_MITER:
+			default: join = NVG_MITER;
+		}
+		nvgLineJoin(currentContext->vg, join);
+		nvgLineCap(currentContext->vg, shape->strokeLineCap); // NanoSVG has the same line cap constants values as NanoVG 
+		nvgStrokeWidth(currentContext->vg, shape->strokeWidth * strokeWidthFactor);
+
+		// draw line
 		switch (shape->stroke.type) {
 			case NSVG_PAINT_COLOR:
-				nvgStrokeColor(vg, SVGCOLOR(shape->stroke.color, shape->opacity * alpha));
-				nvgStroke(vg);
+				nvgStrokeColor(currentContext->vg, SVGCOLOR(shape->stroke.color, r, g, b, shape->opacity * a));
+				if (strokeWidthScaling != 0)
+					nvgStroke(currentContext->vg);
+				else
+					nvgStrokeNoScale(currentContext->vg);
 				break;
 			case NSVG_PAINT_LINEAR_GRADIENT:
-				nvgStrokePaint(vg, createLinearGradient(shape->stroke.gradient, alpha));
-				nvgStroke(vg);
+				nvgStrokePaint(currentContext->vg, createLinearGradient(shape->stroke.gradient, r, g, b, shape->opacity * a));
+				if (strokeWidthScaling != 0)
+					nvgStroke(currentContext->vg);
+				else
+					nvgStrokeNoScale(currentContext->vg);
 				break;
 			case NSVG_PAINT_RADIAL_GRADIENT:
-				nvgStrokePaint(vg, createRadialGradient(shape->stroke.gradient, alpha));
-				nvgStroke(vg);
+				nvgStrokePaint(currentContext->vg, createRadialGradient(shape->stroke.gradient, r, g, b, shape->opacity * a));
+				if (strokeWidthScaling != 0)
+					nvgStroke(currentContext->vg);
+				else
+					nvgStrokeNoScale(currentContext->vg);
 				break;
 		}
-
-		switch (shape->strokeLineCap) {
-			case NSVG_JOIN_MITER: cap = NVG_MITER; break;
-			case NSVG_JOIN_ROUND: cap = NVG_ROUND; break;
-			case NSVG_JOIN_BEVEL: cap = NVG_BEVEL; break;
-			default: cap = NVG_MITER;
-		}
-		nvgLineCap(vg, cap);
-		nvgLineJoin(vg, shape->strokeLineJoin);
 	}
 }
 
 EXPORT void nsvg_Rasterize(NSVGimage* image, float tx, float ty, float scale, unsigned char* dst, int w, int h) {
-	if(rasterizer == NULL)
-		rasterizer = nsvgCreateRasterizer();
+	if(currentContext->rasterizer == NULL)
+		currentContext->rasterizer = nsvgCreateRasterizer();
 
-	nsvgRasterize(rasterizer, image, tx, ty, scale, dst, w, h, w*4);
+	nsvgRasterize(currentContext->rasterizer, image, tx, ty, scale, dst, w, h, w*4);
 }
 
 EXPORT void nsvg_Delete(NSVGimage* image) {
+	remove(currentContext->svgImages, image);
 	nsvgDelete(image);
 }
