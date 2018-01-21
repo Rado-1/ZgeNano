@@ -12,7 +12,9 @@
 *.save
 *.depend
 *.layout
-nanovg/
+nanovg/*
+!nanovg/src/
+nanovg/src/*
 !nanovg/src/nanovg.h
 !nanovg/src/nanovg.c
 nanosvg/
