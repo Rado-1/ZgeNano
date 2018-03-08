@@ -46,6 +46,7 @@ misrepresented as being the original software.
 #include <stdio.h>
 #include <unordered_map>
 #include <vector>
+#include <regex>
 
 //#ifdef _WIN32
 #define GLEW_STATIC
@@ -149,8 +150,11 @@ EXPORT void nvg_SetViewport() {
 	currentContext->devicePixelRatio = viewport[3] != 0 ? (float) viewport[2] / (float) viewport[3] : 0;
 }
 
-EXPORT void nvg_SetContext(ZNVGcontext* context) {
-	currentContext = context;
+EXPORT ZNVGcontext* nvg_SetContext(void* contextKey) {
+	auto search = contexts.find(contextKey);
+	if (search != contexts.end())
+		currentContext = search->second;
+	return currentContext;
 }
 
 EXPORT ZNVGcontext* nvg_Init(int flags, void* contextKey) {
@@ -177,15 +181,13 @@ EXPORT ZNVGcontext* nvg_Init(int flags, void* contextKey) {
 	return currentContext;
 }
 
-EXPORT void nvg_Finish(ZNVGcontext* context) {
-	auto current = contexts.begin();
+EXPORT void nvg_Finish(void* contextKey) {
+	auto search = contexts.find(contextKey);
 
-	for (auto iter = contexts.begin(); iter != contexts.end(); ++iter)
-		if (iter->second == context) {
-			delete iter->second;
-			contexts.erase(iter);
-			break;
-		}
+	if (search != contexts.end()) {
+		delete search->second;
+		contexts.erase(search);
+	}
 }
 
 
@@ -661,34 +663,72 @@ EXPORT void nsvg_ImageSize(NSVGimage* image, float &width, float &height) {
 	height = image->height;
 }
 
-EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPrefix, int strokeWidthScaling, float strokeWidthFactor, float* color) {
-	int join, cap;
-	float r, g, b, a;
-	
-	if (color == NULL) {
-		r = g = b = a = 1.0;
-	} else {
-		r = color[0];
-		g = color[1]; b = color[2];
-		a = color[3];
-	}
+EXPORT int nsvg_ImageShapeCount(NSVGimage* image, char* shapeIdPattern) {
+	int i = 0;
 
-	// iterate shapes
 	for (NSVGshape *shape = image->shapes; shape != NULL; shape = shape->next) {
+
+		std::regex pattern (shapeIdPattern != NULL ? shapeIdPattern : "");
 
 		// skip invisible shape
 		if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
 
-		// skip shape with prefix not started with shapeIdPrefix, if specified
-		if (shapeIdPrefix != NULL &&
-			strncmp(shapeIdPrefix, shape->id, strlen(shapeIdPrefix))) continue;
+		// skip shape with not matching ID pattern
+		if (shapeIdPattern != NULL &&
+			!std::regex_match(shape->id, pattern)) continue;
+	
+		i++;
+	}
 
+	return i;
+}
+
+EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPattern, int strokeWidthScaling,
+	float strokeWidthFactor, float buildUpFactor, float* color) {
+
+	int join, cap;
+	float r, g, b, a;
+	float buildUpAlpha = 0.0;
+	int buildUpCount = -1;
+	std::regex pattern(shapeIdPattern != NULL ? shapeIdPattern : "");
+
+	// prepare build-up properties
+	if (buildUpFactor >= 0.0) {
+		float i;
+		buildUpAlpha = modf(buildUpFactor, &i);
+		buildUpCount = floor(i);
+	}
+
+	if (color == NULL) {
+		r = g = b = a = 1.0;
+	} else {
+		r = color[0];
+		g = color[1];
+		b = color[2];
+		a = color[3];
+	}
+
+	// iterate shapes
+	for (NSVGshape *shape = image->shapes; shape != NULL ||
+		(!buildUpCount && buildUpAlpha > 0.0001); shape = shape->next) {
+
+		// skip invisible shape
+		if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
+
+		// skip shape with not matching ID pattern
+		if (shapeIdPattern != NULL &&
+			!std::regex_match(shape->id, pattern)) continue;
+
+		// set build-up alpha for the last shape
+		if (!buildUpCount)
+			a *= buildUpAlpha;
+		
 		nvgBeginPath(currentContext->vg);
 		bool pathHole = false;
 
 		// draw paths
 		for (NSVGpath *path = shape->paths; path != NULL; path = path->next) {
-
+			
 			if (pathHole)
 				nvgPathWinding(currentContext->vg, NVG_HOLE);
 			else
@@ -756,6 +796,12 @@ EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPrefix, int strokeWidthScal
 					nvgStrokeNoScale(currentContext->vg);
 				break;
 		}
+
+		// decrease build-up counter or finish drawing if 0
+		if (!buildUpCount)
+			break;
+		else
+			buildUpCount--;
 	}
 }
 

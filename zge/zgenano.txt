@@ -6,7 +6,7 @@ ZZDC<?xml version="1.0" encoding="iso-8859-1" ?>
   build on NanoVG: https://github.com/memononen/nanovg
   and NanoSVG: https://github.com/memononen/nanosvg
 
-  Version: 1.1 (2018-01-20)
+  Version: 1.2 (2018-03-07)
 
   Download Windows DLL and Android shared library from
   https://github.com/Rado-1/ZgeNano/releases
@@ -91,8 +91,8 @@ const int
 
 // Init
 xptr nvg_Init(int flags, xptr contextKey) {}
-void nvg_SetContext(xptr context) {}
-void nvg_Finish(xptr context) {}
+xptr nvg_SetContext(xptr contextKey) {}
+void nvg_Finish(xptr contextKey) {}
 void nvg_SetViewport() {}
 
 // Drawing
@@ -200,7 +200,9 @@ void nvg_TextMetrics(ref float ascender, ref float descender, ref float lineh) {
 xptr nsvg_ParseFromFile(string filename, string units, float dpi) {}
 xptr nsvg_ParseMem(xptr data, int ndata, string units, float dpi) {}
 void nsvg_ImageSize(xptr image, ref float width, ref float height) {}
-void nsvg_Draw(xptr image, string shapeIdPrefix, int strokeWidthScaling, float strokeWidthFactor, xptr color) {}
+int nsvg_ImageShapeCount(xptr image, string shapeIdPrefix) {}
+void nsvg_Draw(xptr image, string shapeIdPrefix,
+  int strokeWidthScaling, float strokeWidthFactor, float buildUpFactor, xptr color) {}
 void nsvg_Rasterize(xptr image, float tx, float ty, float scale, xptr dst, int w, int h) {}
 void nsvg_Delete(xptr image) {}]]>
   </Source>
