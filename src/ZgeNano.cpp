@@ -684,21 +684,29 @@ EXPORT int nsvg_ImageShapeCount(NSVGimage* image, char* shapeIdPattern) {
 }
 
 EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPattern, int strokeWidthScaling,
-	float strokeWidthFactor, float buildUpFactor, float* color) {
+	float strokeWidthFactor, float buildUpFactorFrom, float buildUpFactorTo, float* color) {
+
+	// skip drawing if builtup from is greter than (equal to) builtup to
+	if (buildUpFactorTo >= 0 && buildUpFactorFrom >= buildUpFactorTo) return;
 
 	int join, cap;
-	float r, g, b, a;
-	float buildUpAlpha = 0.0;
-	int buildUpCount = -1;
+	float i, r, g, b, a;
+	float buildUpFromAlpha = 1.0, buildUpToAlpha = 0.0;
+	int buildUpFromCount = -1, buildUpToCount = -1;
 	std::regex pattern(shapeIdPattern != NULL ? shapeIdPattern : "");
 
 	// prepare build-up properties
-	if (buildUpFactor >= 0.0) {
-		float i;
-		buildUpAlpha = modf(buildUpFactor, &i);
-		buildUpCount = floor(i);
+	if (buildUpFactorFrom >= 0.0) {
+		buildUpFromAlpha = 1.0 - modf(buildUpFactorFrom, &i);
+		buildUpFromCount = floor(i) + 1;
 	}
 
+	if (buildUpFactorTo >= 0.0) {
+		buildUpToAlpha = modf(buildUpFactorTo, &i);
+		buildUpToCount = floor(i) + 1;
+	}
+
+	// custom color
 	if (color == NULL) {
 		r = g = b = a = 1.0;
 	} else {
@@ -709,8 +717,7 @@ EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPattern, int strokeWidthSca
 	}
 
 	// iterate shapes
-	for (NSVGshape *shape = image->shapes; shape != NULL ||
-		(!buildUpCount && buildUpAlpha > 0.0001); shape = shape->next) {
+	for (NSVGshape *shape = image->shapes; shape != NULL; shape = shape->next) {
 
 		// skip invisible shape
 		if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
@@ -719,9 +726,21 @@ EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPattern, int strokeWidthSca
 		if (shapeIdPattern != NULL &&
 			!std::regex_match(shape->id, pattern)) continue;
 
+		// decrease build-up counter or finish drawing if 0
+		if (--buildUpToCount == -1) break;
+
+		// skip shape under builtup from
+		if (--buildUpFromCount > 0) continue;
+
+		// set build-up alpha for the first visible shape
+		if (!buildUpFromCount)
+			a *= buildUpFromAlpha;
+		else if (buildUpFromCount == -1)
+			a = color[3];
+
 		// set build-up alpha for the last shape
-		if (!buildUpCount)
-			a *= buildUpAlpha;
+		if (!buildUpToCount)
+			a *= buildUpToAlpha;
 		
 		nvgBeginPath(currentContext->vg);
 		bool pathHole = false;
@@ -796,12 +815,6 @@ EXPORT void nsvg_Draw(NSVGimage* image, char* shapeIdPattern, int strokeWidthSca
 					nvgStrokeNoScale(currentContext->vg);
 				break;
 		}
-
-		// decrease build-up counter or finish drawing if 0
-		if (!buildUpCount)
-			break;
-		else
-			buildUpCount--;
 	}
 }
 
