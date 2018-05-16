@@ -665,10 +665,9 @@ EXPORT void nsvg_ImageSize(NSVGimage* image, float &width, float &height) {
 
 EXPORT int nsvg_ImageShapeCount(NSVGimage* image, char* shapeIdPattern) {
 	int i = 0;
+	std::regex pattern(shapeIdPattern != NULL ? shapeIdPattern : "");
 
 	for (NSVGshape *shape = image->shapes; shape != NULL; shape = shape->next) {
-
-		std::regex pattern (shapeIdPattern != NULL ? shapeIdPattern : "");
 
 		// skip invisible shape
 		if (!(shape->flags & NSVG_FLAGS_VISIBLE)) continue;
