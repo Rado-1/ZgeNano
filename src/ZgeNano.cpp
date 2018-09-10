@@ -22,29 +22,24 @@ misrepresented as being the original software.
 */
 
 /// The main file used to compile Windows DLL and Android shared library
-/// Version: 1.1 (2018 - 01 - 09)
+/// Version: 1.4 (2018-09-10)
 
 
 // Definitions
 
-#define DONE 0
-#define ERROR -1
-//typedef void* ptr;
-
-//#ifdef _WIN32
+#ifdef _WINDOWS
 #define EXPORT extern "C" __declspec(dllexport)
 #undef NULL
 #define NULL nullptr
-//#else
-//#define EXPORT extern "C"
-//#endif
+#else
+#define EXPORT extern "C"
+#endif
 
 
 // Includes
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <unordered_map>
 #include <vector>
 #include <regex>
 
@@ -136,58 +131,50 @@ inline NVGcolor SVGCOLOR(unsigned int c, float r, float g, float b, float a) {
 // Globals
 
 ZNVGcontext* currentContext;
-std::unordered_map<void*, ZNVGcontext*> contexts;
 GLint viewport[4];
 bool initializeTinf = true;
 
 
 // Init
 
-EXPORT void nvg_SetViewport() {
+EXPORT bool nvg_SetViewport(ZNVGcontext* context) {
+	currentContext = context;
+
 	glGetIntegerv(GL_VIEWPORT, viewport);
-	currentContext->winWidth = viewport[2];
-	currentContext->winHeight = viewport[3];
-	currentContext->devicePixelRatio = viewport[3] != 0 ? (float) viewport[2] / (float) viewport[3] : 0;
+	float ratio = viewport[3] != 0 ? (float)viewport[2] / (float)viewport[3] : 0;
+
+	if (currentContext->winWidth != viewport[2] ||
+		currentContext->winHeight != viewport[3] ||
+		currentContext->devicePixelRatio != ratio) {
+
+		currentContext->winWidth = viewport[2];
+		currentContext->winHeight = viewport[3];
+		currentContext->devicePixelRatio = ratio;
+		return true;
+	} else
+		return false;
 }
 
-EXPORT ZNVGcontext* nvg_SetContext(void* contextKey) {
-	auto search = contexts.find(contextKey);
-	if (search != contexts.end())
-		currentContext = search->second;
-	return currentContext;
+EXPORT void nvg_SetContext(ZNVGcontext* context) {
+	currentContext = context;
 }
 
-EXPORT ZNVGcontext* nvg_Init(int flags, void* contextKey) {
+EXPORT ZNVGcontext* nvg_Init(int flags) {
 
-	auto search = contexts.find(contextKey);
+	// create new context
+	struct NVGcontext* vg;
 
-	if (search == contexts.end()) {
-		// context not found => create new one
-		struct NVGcontext* vg;
+	if (glewInit() != GLEW_OK) return NULL;
+	vg = nvgCreateGL2(flags);
+	if (vg == NULL) return NULL;
 
-		if (glewInit() != GLEW_OK) return NULL;
-		vg = nvgCreateGL2(flags);
-		if (vg == NULL) return NULL;
-
-		currentContext = new ZNVGcontext(vg);
-
-		contexts.insert({ contextKey, currentContext });
-		nvg_SetViewport();
-	} else {
-		// context already exist
-		currentContext = search->second;
-	}
+	currentContext = new ZNVGcontext(vg);
 
 	return currentContext;
 }
 
-EXPORT void nvg_Finish(void* contextKey) {
-	auto search = contexts.find(contextKey);
-
-	if (search != contexts.end()) {
-		delete search->second;
-		contexts.erase(search);
-	}
+EXPORT void nvg_Finish(ZNVGcontext* context) {
+	delete context;
 }
 
 
