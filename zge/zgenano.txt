@@ -175,7 +175,7 @@ void nvg_Ellipse(float cx, float cy, float rx, float ry) {}
 void nvg_Circle(float cx, float cy, float r) {}
 void nvg_Fill() {}
 void nvg_Stroke() {}
-void vg_StrokeNoScale() {}
+void nvg_StrokeNoScale() {}
 
 // Text
 int nvg_CreateFont(string name, string filename) {}
